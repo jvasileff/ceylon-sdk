@@ -408,41 +408,55 @@ shared final class Whole
         // Knuth 4.3.1 Algorithm M
         value wMask = wordMask;
         value wSize = wordSize;
-        
+
         value uSize = size(u);
         value vSize = size(v);
-        value result = newWords(uSize + vSize);
 
-        variable value carry = 0;
+        value uHead = consOfWordsLowFirst(u);
+        value vHead = consOfWordsLowFirst(v);
+        value rHead = consOfSize(uSize + vSize); // low first
 
         // result is all zeros the first time through
-        variable value j = vSize;
-        value uLow = get(u, uSize - 1);
-        while (--j >= 0) {
-            value k = uSize + j;
-            value vj = get(v, j);
-            value product = uLow * vj + carry;
-            set(result, k, product.and(wMask));
+        variable value rIter = rHead;
+        variable value vIter = vHead;
+        variable value carry = 0;
+        assert (exists uLow = uHead?.word);
+        while (exists vCurr = vIter) {
+            assert (exists rCurr = rIter);
+            value product = uLow * vCurr.word + carry;
+            rCurr.word = product.and(wMask);
             carry = product.rightLogicalShift(wSize);
+            vIter = vCurr.tail;
+            rIter = rCurr.tail;
         }
-        set(result, uSize - 1, carry);
+        assert (exists rCarry1 = rIter);
+        rCarry1.word = carry;
 
-        variable value i = uSize - 1;
-        while (--i >= 0) {
+        variable value uIter = uHead?.tail; // we already did the first one
+        variable value rStart = rHead?.tail; // skip one on the results as well
+        while (exists uCurr = uIter) {
+            value uCurrWord = uCurr.word;
             carry = 0;
-            j = vSize;
-            value ui = get(u, i);
-            while (--j >= 0) {
-                value k = i + j + 1;
-                value vj = get(v, j);
-                value wk = get(result, k);
-                value product = ui * vj + wk + carry;
-                set(result, k, product.and(wMask));
+            vIter = vHead;
+            rIter = rStart;
+            while (exists vCurr = vIter) {
+                assert (exists rCurr = rIter);
+                value product = uCurrWord * vCurr.word + rCurr.word + carry;
+                rCurr.word = product.and(wMask);
                 carry = product.rightLogicalShift(wSize);
+                vIter = vCurr.tail;
+                rIter = rCurr.tail;
             }
-            set(result, i, carry);
+            assert (exists rCarry2 = rIter);
+            rCarry2.word = carry;
+            uIter = uCurr.tail;
+            rStart = rStart?.tail;
         }
-        return result;
+
+        // if the high word was zero, leave off one word to
+        // avoid future normalization copy
+        value carryAdjustment = if (carry == 0) then -1 else 0;
+        return wordsOfConsLowFirst(rHead, uSize + vSize + carryAdjustment);
     }
 
     Words multiplyWord(Words u, Integer v, Words? r = null) {
@@ -516,7 +530,7 @@ shared final class Whole
         Words u;
         Words v;
         if (d == 1) {
-            u = consWord(0, dividend);
+            u = consWord(0, words);
             v = divisor;
         }
         else {
