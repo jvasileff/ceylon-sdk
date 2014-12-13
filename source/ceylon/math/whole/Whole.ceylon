@@ -391,29 +391,58 @@ shared final class Whole
         return wordsOfWordList(rList);
     }
 
-    Words subtract(Words u, Words v, Words? r = null) {
+    Words subtract(Words u, Words v, Words? r = null) { // FIXME new impl ignores r
         // Knuth 4.3.1 Algorithm S
-        // assert(compareMagnitude(u, v) == larger);
-        value result = r else newWords(size(u));
-        value resultSize = size(result);
+        value wMask = wordMask;
+        value wSize = wordSize;
+
+        value uList = wordListOfWords(u);
+        value vList = wordListOfWords(v);
+        assert (uList.size >= vList.size);
+
+        value rList = wordListOfSize(uList.size);
+        variable WordCell? uIter = uList.lowWord;
+        variable WordCell? vIter = vList.lowWord;
+        variable WordCell? rIter = rList.lowWord;
         variable value borrow = 0;
 
-        // start from the last element (least-significant)
-        for (j in 0:size(u)) {
-            value uj = get(u, size(u) - j - 1); // never null
-            value vj = if (j < size(v)) then get(v, size(v) - j - 1) else 0; // null when index < 0
-            value difference = uj - vj + borrow;
-            result.set(resultSize - j - 1, difference.and(wordMask));
-            borrow = difference.rightArithmeticShift(wordSize);
+        while (exists vCurr = vIter) {
+            assert(exists uCurr = uIter);
+            assert(exists rCurr = rIter);
+
+            value difference = uCurr.word - vCurr.word + borrow;
+            rCurr.word = difference.and(wMask);
+            borrow = difference.rightArithmeticShift(wSize);
+
+            uIter = uCurr.nextHigher;
+            vIter = vCurr.nextHigher;
+            rIter = rCurr.nextHigher;
         }
 
-        // zero out the leading portion of the result array
-        // if an oversized array was provided
-        for (i in 0:resultSize-size(u)) {
-            result.set(i, 0);
+        // remaining u's
+        while (borrow != 0, exists uCurr = uIter) {
+            assert(exists rCurr = rIter);
+
+            value difference = uCurr.word + borrow;
+            rCurr.word = difference.and(wMask);
+            borrow = difference.rightArithmeticShift(wSize);
+
+            uIter = uCurr.nextHigher;
+            rIter = rCurr.nextHigher;
         }
 
-        return result;
+        // remaining u's w/o borrow
+        while (exists uCurr = uIter) {
+            assert(exists rCurr = rIter);
+
+            rCurr.word = uCurr.word;
+
+            uIter = uCurr.nextHigher;
+            rIter = rCurr.nextHigher;
+        }
+
+        rList.normalize();
+        return wordsOfWordList(rList);
     }
 
     Words multiply(Words u, Words v) {
