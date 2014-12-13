@@ -333,50 +333,62 @@ shared final class Whole
 
     Words add(Words first, Words second) {
         // Knuth 4.3.1 Algorithm A
-        //assert(!first.empty && !second.empty);
-
-        Words u;
-        Words v;
-        if (size(first) >= size(second)) {
-            u = first;
-            v = second;
-        } else {
-            u = second;
-            v = first;
-        }
         value wMask = wordMask;
         value wSize = wordSize;
-        value result = newWords(size(u));
 
-        // start from the last element (least-significant)
-        variable value uIndex = size(u) - 1;
-        variable value vIndex = size(v) - 1;
-        variable value carry = 0;
-
-        while (vIndex >= 0) {
-            value sum = get(u, uIndex) + get(v, vIndex) + carry;
-            result.set(uIndex, sum.and(wMask));
-            carry = sum.rightLogicalShift(wSize);
-            uIndex -= 1;
-            vIndex -= 1;
+        WordList uList;
+        WordList vList;
+        if (size(first) >= size(second)) {
+            uList = wordListOfWords(first);
+            vList = wordListOfWords(second);
+        } else {
+            uList = wordListOfWords(second);
+            vList = wordListOfWords(first);
         }
 
-        while (uIndex >= 0) {
-            if (carry == 0) {
-                // simply copy the remaining words from u
-                copyWords(u, result, 0, 0, uIndex + 1);
-                break;
-            }
-            value sum = get(u, uIndex) + carry;
-            result.set(uIndex, sum.and(wMask));
+        value rList = wordListOfSize(uList.size);
+
+        variable WordCell? uIter = uList.lowWord;
+        variable WordCell? vIter = vList.lowWord;
+        variable WordCell? rIter = rList.lowWord;
+        variable value carry = 0;
+
+        // add u's and v's
+        while (exists vCurr = vIter) {
+            assert(exists uCurr = uIter);
+            assert(exists rCurr = rIter);
+            value sum = uCurr.word + vCurr.word + carry;
+            rCurr.word = sum.and(wMask);
             carry = sum.rightLogicalShift(wSize);
-            uIndex -= 1;
+            vIter = vCurr.nextHigher;
+            uIter = uCurr.nextHigher;
+            rIter = rCurr.nextHigher;
+        }
+
+        // only u's remain
+        while (carry != 0, exists uCurr = uIter) {
+            assert(exists rCurr = rIter);
+            value sum = uCurr.word + carry;
+            rCurr.word = sum.and(wMask);
+            carry = sum.rightLogicalShift(wSize);
+            uIter = uCurr.nextHigher;
+            rIter = rCurr.nextHigher;
+        }
+
+        // copy reamining u's, w/o carry
+        while (exists uCurr = uIter) {
+            assert(exists rCurr = rIter);
+            rCurr.word = uCurr.word;
+            uIter = uCurr.nextHigher;
+            rIter = rCurr.nextHigher;
         }
 
         // remaining carry, if any
-        return if (carry != 0)
-               then consWord(1, result)
-               else result;
+        if (carry != 0) {
+            rList.insertHighWord(carry);
+        }
+
+        return wordsOfWordList(rList);
     }
 
     Words subtract(Words u, Words v, Words? r = null) {
