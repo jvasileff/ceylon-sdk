@@ -3,6 +3,16 @@ class WordList(size = 0, highWord = null, lowWord = null) {
     shared variable WordCell? highWord;
     shared variable WordCell? lowWord;
 
+    shared WordCell unsafeHighWord {
+        assert (exists result = highWord);
+        return result;
+    }
+
+    shared WordCell unsafeLowWord {
+        assert (exists result = lowWord);
+        return result;
+    }
+
     shared void normalize() {
         variable value newHigh = highWord;
         while (exists hw = newHigh, hw.word == 0) {
@@ -77,6 +87,23 @@ WordList wordListOfSize(Integer size) {
         higherWord = cell;
     }
     return WordList(size, highWord, higherWord);
+}
+
+WordList wordListCopy(WordList source) { // TODO untested
+    if (source.size == 0) {
+        return WordList();
+    }
+    assert (exists sourceHigh = source.highWord);
+    WordCell highWord = WordCell(sourceHigh.word);
+    variable WordCell higherWord = highWord;
+    variable value sourceIter = sourceHigh.nextLower;
+    while (exists sourceCurr = sourceIter) {
+        value cell = WordCell(sourceCurr.word, higherWord);
+        higherWord.nextLower = cell;
+        higherWord = cell;
+        sourceIter = sourceCurr.nextLower;
+    }
+    return WordList(source.size, highWord, higherWord);
 }
 
 WordList wordListOfWords(Words from) {

@@ -81,9 +81,9 @@ shared final class Whole
             case (smaller)
                 [package.zero, this]
             case (larger)
-                (let (resultWords   = divide(wordsOfWordList(this.words), wordsOfWordList(other.words)))
-                 [Internal(sign * other.sign, wordListOfWords(resultWords.first)),
-                  Internal(sign, wordListOfWords(resultWords.last))]));
+                (let (resultWords   = divide(this.words, other.words))
+                 [Internal(sign * other.sign, resultWords.first),
+                  Internal(sign, resultWords.last)]));
     }
 
     shared actual Whole divided(Whole other)
@@ -499,6 +499,43 @@ shared final class Whole
         return rList;
     }
 
+    WordList multiplyWord2(
+            WordList u, Integer v, WordList r = wordListOfSize(u.size)) {
+        assert(v.and(wordMask) == v);
+
+        value wMask = wordMask;
+
+        variable value carry = 0;
+        variable value uIter = u.lowWord;
+        variable value rIter = r.lowWord;
+        while (exists uCurr = uIter) {
+            assert (exists rCurr = rIter);
+            value product = uCurr.word * v + carry;
+            rCurr.word = product.and(wMask);
+            carry = product.rightLogicalShift(wordSize);
+            uIter = uCurr.nextHigher;
+            rIter = rCurr.nextHigher;
+        }
+
+        if (!carry.zero) {
+            if (exists rCurr = rIter) {
+                rCurr.word = carry;
+                rIter = rCurr.nextHigher;
+            }
+            else {
+                r.addHighWord(carry);
+            }
+        }
+
+        // provided `r` may be larger than necessary
+        while (exists rCurr = rIter) {
+            rCurr.word = 0;
+            rIter = rCurr.nextHigher;
+        }
+
+        return r;
+    }
+
     Words multiplyWord(Words u, Integer v, Words? r = null) {
         assert(v.and(wordMask) == v);
 
@@ -532,61 +569,92 @@ shared final class Whole
 
     "`u[j+1..j+vSize] <- u[j+1..j+vSize] - v * q`, returning the absolute value
      of the final borrow that would normally be subtracted against u[j]."
-    Integer multiplyAndSubtract(Words u,
-                                Words v,
-                                Integer q,
-                                Integer j) {
-        assert(size(u) > size(v) + j);
+    Integer multiplyAndSubtract(WordCell uLow,
+                                WordList v,
+                                Integer q) {
+
         variable Integer absBorrow = 0;
-        for (i in size(v)..1) {
-            value vi = get(v, i - 1);
-            value ui = get(u, j + i);
+
+        // put into a portion u the result of
+        //      v*q subtracted from a portion of u
+        // iterate low to high on u, need the cell for j+vSize to be passed in.
+
+        variable WordCell? vIter = v.lowWord;
+        variable WordCell? uIter = uLow;
+
+        while (exists vCurr = vIter) {
+            assert (exists uCurr = uIter);
 
             // the product is subtracted, so absBorrow adds to it
-            value product = q * vi + absBorrow;
-            value difference = ui - product.and(wordMask);
-            u.set(j + i, difference.and(wordMask));
+            value product = q * vCurr.word + absBorrow;
+            value difference = uCurr.word - product.and(wordMask); // TODO wMask local
+            uCurr.word = difference.and(wordMask);
             absBorrow = product.rightLogicalShift(wordSize) -
                         difference.rightArithmeticShift(wordSize);
+
+            vIter = vCurr.nextHigher;
+            uIter = uCurr.nextHigher;
         }
+
         return absBorrow;
     }
 
-    [Words, Words] divide(
-            Words dividend, Words divisor) {
-        if (size(divisor) < 2) {
-            value first = get(divisor, 0);
-            return divideWord(dividend, first);
+    [WordList, WordList] divide(WordList dividend, WordList divisor) {
+        if (divisor.size < 2) {
+            assert (exists cell = divisor.highWord);
+            return (divideWord(dividend, cell.word));
         }
 
         // Knuth 4.3.1 Algorithm D
-        // assert(size(divisor) >= 2);
 
         // D1. Normalize
         // TODO: left shift such that v0 >= radix/2 instead of the times approach
-        value m = size(dividend) - size(divisor);
+        value m = dividend.size - divisor.size;
         value b = wordRadix;
-        value d = b / (get(divisor, 0) + 1);
-        Words u;
-        Words v;
+        value d = b / (divisor.unsafeHighWord.word + 1);
+        WordList u;
+        WordList v;
         if (d == 1) {
-            u = consWord(0, dividend); // FIXME on other branch (was using words prop!!!)
+            u = wordListCopy(dividend); // FIXME on other branch (was using words prop!!!)
+            u.addHighWord(0);
             v = divisor;
         }
         else {
-            u = multiplyWord(dividend, d); // size(u) == size(dividend) + 1
-            v = multiplyWord(divisor, d, newWords(size(divisor)));
+            // size of u will be the size of dividend + 1
+            u = multiplyWord2(dividend, d);
+            // size of v will be the size of divisor
+            v = multiplyWord2(divisor, d);
+
+            if (u.size == dividend.size) {
+                u.addHighWord(0);
+            }
         }
-        Words q = newWords(m + 1); // quotient
-        value v0 = get(v, 0); // most significant, can't be 0
-        value v1 = get(v, 1); // second most significant must also exist
+        WordList q = wordListOfSize(m + 1); // quotient
+        value v0Cell = v.unsafeHighWord; // most significant, can't be 0
+        value v1Cell = v0Cell.unsafeLower; // second most significant must also exist
+        value v0 = v0Cell.word;
+        value v1 = v1Cell.word;
+
+        variable WordCell? uj0Iter = u.highWord;
+        variable WordCell? qIter = q.highWord;
+
+        // skip high words of u, so that the initial range of u-words
+        // is large enough to divide by v
+        variable WordCell? uIter = u.highWord;
+        for (_ in 0:v.size) {
+            uIter = uIter?.nextLower;
+        }
 
         // D2. Initialize j
-        for (j in 0..m) {
+        while (exists uCurr = uIter) {
+            assert (exists qCurr = qIter);
+            assert (exists uj0Curr = uj0Iter);
+
             // D3. Compute qj
-            value uj0 = get(u, j);
-            value uj1 = get(u, j+1);
-            value uj2 = get(u, j+2);
+            value uj0 = uj0Curr.word;
+            value uj1 = uj0Curr.unsafeLower.word;
+            value uj2 = uj0Curr.unsafeLower.unsafeLower.word;
+
             value uj01 = uj0.leftLogicalShift(wordSize) + uj1;
             variable Integer qj;
             variable Integer rj;
@@ -610,57 +678,57 @@ shared final class Whole
 
             // D4. Multiply, Subtract
             if (qj != 0) {
-                value borrow = multiplyAndSubtract(u, v, qj, j);
+                value borrow = multiplyAndSubtract(uCurr, v, qj);
                 if (borrow != uj0) {
                     // assert borrow > uj0;
                     throw Exception("case not handled");
                 }
-                u.set(j, 0);
-                q.set(j, qj);
+                uj0Curr.word = 0;
+                qCurr.word = qj;
             }
-        }
 
-        Words normalized(Words xs) {
-            variable value zeros = 0;
-            while (zeros < size(xs) && get(xs, zeros) == 0) {
-                zeros++;
-            }
-            return if (zeros == 0) then
-            xs
-            else if (zeros == xs.size) then
-            newWords(0)
-            else // FIXME do an internal offset for this:
-            skipWords(xs, zeros);
+            // loop
+            qIter = qCurr.nextLower;
+            uIter = uCurr.nextLower;
+            uj0Iter = uj0Curr.nextLower;
         }
 
         // D8. Unnormalize Remainder Due to Step D1
-        variable Words remainder = normalized(u);
-        if (!remainder.size == 0 && d != 1) {
+        u.normalize();
+        variable value remainder = u;
+        if (!u.size == 0 && d != 1) {
             remainder = divideWord(remainder, d).first;
         }
         return [q, remainder];
     }
 
-    [Words, Words] divideWord(Words u, Integer v) {
-        assert(size(u) >= 1);
+    [WordList, WordList] divideWord(WordList u, Integer v) {
+        assert(u.size >= 1);
         assert(v.and(wordMask) == v);
+
         variable value r = 0;
-        value q = newWords(size(u));
-        for (j in 0..size(u)-1) {
-            value uj = get(u, j);
-            value x = r * wordRadix + uj;
+        value q = wordListOfSize(u.size);
+        variable value uIter = u.highWord;
+        variable value qIter = q.highWord;
+
+        while (exists uCurr = uIter) {
+            assert (exists qCurr = qIter);
+            value x = r * wordRadix + uCurr.word;
             if (x >= 0) {
-                q.set(j, x / v);
+                qCurr.word = x / v;
                 r = x % v;
-            } else {
+            }
+            else {
                 value qr = unsignedDivide(x, v);
-                q.set(j, qr.rightLogicalShift(wordSize));
+                qCurr.word = qr.rightLogicalShift(wordSize);
                 r = qr.and(wordMask);
             }
+            uIter = uCurr.nextLower;
+            qIter = qCurr.nextLower;
         }
-        return [q, if (r.zero)
-                   then newWords(0)
-                   else wordsOfOne(r)];
+        return [q, if (r == 0)
+                    then wordListOfSize(0)
+                    else wordListOfOne(r)];
     }
 
     Whole leftLogicalShift(Integer shift) => nothing;
