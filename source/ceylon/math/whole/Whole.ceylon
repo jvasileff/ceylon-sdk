@@ -5,17 +5,15 @@ shared final class Whole
 
     shared actual Integer sign;
 
-    Words words;
+    WordList words;
 
     variable Integer? integerMemo = null;
 
     variable String? stringMemo = null;
 
-    variable Integer lastNonZeroIndexMemo = -99;
-
-    shared new Internal(Integer sign, variable Words words) {
+    shared new Internal(Integer sign, variable WordList words) {
         // FIXME should be package private when available
-        words = normalized(words);
+        words.normalize();
 
         // words must fit with word-size bits
         //if (words.any((word) => word != word.and(wordMask))) {
@@ -24,9 +22,9 @@ shared final class Whole
 
         // sign must not be 0 if magnitude != 0
         assert (-1 <= sign <= 1);
-        assert (!sign == 0 || size(words) == 0);
+        assert (!sign == 0 || words.size == 0);
 
-        this.sign = if (size(words) == 0) then 0 else sign;
+        this.sign = if (words.size == 0) then 0 else sign;
         this.words = words;
     }
 
@@ -83,9 +81,9 @@ shared final class Whole
             case (smaller)
                 [package.zero, this]
             case (larger)
-                (let (resultWords   = divide(this.words, other.words))
-                 [Internal(sign * other.sign, resultWords.first),
-                  Internal(sign, resultWords.last)]));
+                (let (resultWords   = divide(wordsOfWordList(this.words), wordsOfWordList(other.words)))
+                 [Internal(sign * other.sign, wordListOfWords(resultWords.first)),
+                  Internal(sign, wordListOfWords(resultWords.last))]));
     }
 
     shared actual Whole divided(Whole other)
@@ -207,25 +205,33 @@ shared final class Whole
             // for negative numbers, flip the bits and add 1
             variable Integer result = 0;
             // result should have up to integerAddressableSize bits (32 or 64)
-            value count = runtime.integerAddressableSize/wordSize;
-            for (i in (size(words) - count):count) {
-                // most significant first
-                Integer x;
 
-                if (0 <= i < size(words)) {
+            value count = runtime.integerAddressableSize/wordSize;
+
+            variable value wordsIter = words.lowWord;
+            variable value nonZeroSeen = false;
+            for (i in 0:count) {
+                Integer x;
+                if (exists wordsCurr = wordsIter) {
                     if (negative) {
-                        x = if (i >= lastNonZeroIndex)
-                            then get(words, i).negated // negate the least significant non-zero
-                            else get(words, i).not;    // flip the other non-zeros
+                        if (!nonZeroSeen) {
+                            // negate the least significant non-zero
+                            x = wordsCurr.word.negated;
+                            nonZeroSeen = x != 0;
+                        }
+                        else {
+                            // flip the rest
+                            x = wordsCurr.word.not;
+                        }
+                    } else {
+                        x = wordsCurr.word;
                     }
-                    else {
-                        x = get(words, i);
-                    }
+                    wordsIter = wordsCurr.nextHigher;
                 } else {
                     x = if (negative) then -1 else 0;
                 }
-                result = result.leftLogicalShift(wordSize);
-                result = result.plus(x.and(wordMask));
+                value newBits = x.and(wordMask).leftLogicalShift(i * wordSize);
+                result = result.or(newBits);
             }
             return integerMemo = result;
         }
@@ -262,10 +268,9 @@ shared final class Whole
 
     // TODO doc
     shared Boolean even
-        =>  let (wordCount = size(words))
-            if (wordCount > 0)
-            then get(words, wordCount - 1).even
-            else false;
+        =>  if (exists lowWord = words.lowWord)
+            then lowWord.word.even
+            else true;
 
     "The platform-specific implementation object, if any.
      This is provided for interoperation with the runtime
@@ -275,8 +280,10 @@ shared final class Whole
 
     shared actual Integer hash {
         variable Integer result = 0;
-        for (i in 0:size(words)) {
-            result = result * 31 + get(words, i);
+        variable value wordIter = words.lowWord;
+        while (exists wordCurr = wordIter) {
+            result = result * 31 + wordCurr.word;
+            wordIter = wordCurr.nextHigher;
         }
         return sign * result;
     }
@@ -320,30 +327,23 @@ shared final class Whole
         =>  if (is Whole that) then
                 (this === that) ||
                 (this.sign == that.sign &&
-                 wordsEqual(this.words, that.words))
+                 this.words == that.words)
             else
                 false;
 
-    Integer lastNonZeroIndex
-        =>  if (lastNonZeroIndexMemo != -99)
-            then lastNonZeroIndexMemo
-            else (lastNonZeroIndexMemo =
-                    lastIndexWhere(words, (word) => word != 0)
-                    else -1);
-
-    Words add(Words first, Words second) {
+    WordList add(WordList first, WordList second) {
         // Knuth 4.3.1 Algorithm A
         value wMask = wordMask;
         value wSize = wordSize;
 
         WordList uList;
         WordList vList;
-        if (size(first) >= size(second)) {
-            uList = wordListOfWords(first);
-            vList = wordListOfWords(second);
+        if (first.size >= second.size) {
+            uList = first;
+            vList = second;
         } else {
-            uList = wordListOfWords(second);
-            vList = wordListOfWords(first);
+            uList = second;
+            vList = first;
         }
 
         value rList = wordListOfSize(uList.size);
@@ -385,20 +385,18 @@ shared final class Whole
 
         // remaining carry, if any
         if (carry != 0) {
-            rList.insertHighWord(carry);
+            rList.addHighWord(carry);
         }
 
-        return wordsOfWordList(rList);
+        return rList;
     }
 
-    Words subtract(Words u, Words v, Words? r = null) { // FIXME new impl ignores r
+    WordList subtract(WordList uList, WordList vList) {
         // Knuth 4.3.1 Algorithm S
+        assert (uList.size >= vList.size);
+
         value wMask = wordMask;
         value wSize = wordSize;
-
-        value uList = wordListOfWords(u);
-        value vList = wordListOfWords(v);
-        assert (uList.size >= vList.size);
 
         value rList = wordListOfSize(uList.size);
         variable WordCell? uIter = uList.lowWord;
@@ -442,16 +440,14 @@ shared final class Whole
         }
 
         rList.normalize();
-        return wordsOfWordList(rList);
+        return rList;
     }
 
-    Words multiply(Words u, Words v) {
+    WordList multiply(WordList uList, WordList vList) {
         // Knuth 4.3.1 Algorithm M
         value wMask = wordMask;
         value wSize = wordSize;
 
-        value uList = wordListOfWords(u);
-        value vList = wordListOfWords(v);
         value rList = wordListOfSize(uList.size + vList.size);
 
         assert(exists uHead = uList.lowWord);
@@ -499,7 +495,8 @@ shared final class Whole
         if (carry == 0) {
             rList.removeHighWord();
         }
-        return wordsOfWordList(rList);
+
+        return rList;
     }
 
     Words multiplyWord(Words u, Integer v, Words? r = null) {
@@ -573,7 +570,7 @@ shared final class Whole
         Words u;
         Words v;
         if (d == 1) {
-            u = consWord(0, words);
+            u = consWord(0, dividend); // FIXME on other branch (was using words prop!!!)
             v = divisor;
         }
         else {
@@ -623,6 +620,19 @@ shared final class Whole
             }
         }
 
+        Words normalized(Words xs) {
+            variable value zeros = 0;
+            while (zeros < size(xs) && get(xs, zeros) == 0) {
+                zeros++;
+            }
+            return if (zeros == 0) then
+            xs
+            else if (zeros == xs.size) then
+            newWords(0)
+            else // FIXME do an internal offset for this:
+            skipWords(xs, zeros);
+        }
+
         // D8. Unnormalize Remainder Due to Step D1
         variable Words remainder = normalized(u);
         if (!remainder.size == 0 && d != 1) {
@@ -655,36 +665,25 @@ shared final class Whole
 
     Whole leftLogicalShift(Integer shift) => nothing;
 
-    Comparison compareMagnitude(Words x, Words y) {
-        // leading words are most significant, but may be 0
-        variable Integer xZeros = 0;
-        variable Integer yZeros = 0;
-
-        while (xZeros < size(x) then get(x, xZeros).zero else false) {
-            xZeros++;
-        }
-
-        while (yZeros < size(y) then get(y, yZeros).zero else false) {
-            yZeros++;
-        }
-
-        value xRealSize = size(x) - xZeros;
-        value yRealSize = size(y) - yZeros;
-
-        if (xRealSize != yRealSize) {
-            return xRealSize <=> yRealSize;
+    Comparison compareMagnitude(WordList x, WordList y) {
+        if (x.size != y.size) {
+            return x.size <=> y.size;
         }
         else {
-            for (i in 0:xRealSize) {
-                value xi = get(x, xZeros + i);
-                value yi = get(y, yZeros + i);
-                if (xi != yi) {
-                    return xi <=> yi;
+            variable value xIter = x.highWord;
+            variable value yIter = y.highWord;
+            while (exists xCurr = xIter) {
+                assert (exists yCurr = yIter);
+                if (xCurr.word != yCurr.word) {
+                    return xCurr.word <=> yCurr.word;
                 }
+                xIter = xCurr.nextLower;
+                yIter = yCurr.nextLower;
             }
             return equal;
         }
     }
+
 }
 
 

@@ -45,16 +45,3 @@ Integer unsignedDivide(Integer n, Integer d) {
     }
     return quotient * wordRadix + remainder;
 }
-
-Words normalized(Words xs) {
-    variable value zeros = 0;
-    while (zeros < size(xs) && get(xs, zeros) == 0) {
-        zeros++;
-    }
-    return if (zeros == 0) then
-        xs
-    else if (zeros == xs.size) then
-        newWords(0)
-    else // FIXME do an internal offset for this:
-        skipWords(xs, zeros);
-}

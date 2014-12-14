@@ -7,9 +7,9 @@ shared Whole wholeNumber(variable Integer number)
     else if (number == 0)  then zero
     else if (number == 1)  then one
     else if (number == 2)  then two
-    else Whole.Internal(number.sign, integerToWordsAbs(number));
+    else Whole.Internal(number.sign, wordListAbsoluteInteger(number));
 
-Words integerToWordsAbs(variable Integer integer) {
+WordList wordListAbsoluteInteger(variable Integer integer) {
     // * Bitwise operations are not used; JavaScript's min/max Integer range
     //   is greater than what is supported by runtime.integerAddressableSize
     //
@@ -23,14 +23,14 @@ Words integerToWordsAbs(variable Integer integer) {
     //
     // * Having no limits at all would allow numbers as large as 1.79E+308,
     //   and would require a different conversion method.
-    if (! runtime.minIntegerValue <= integer <= runtime.maxIntegerValue) {
-        throw OverflowException();
-    }
-    value words = newWords(64/wordSize);
-    value numWords = 64/wordSize;
-    for (i in 1:numWords) {
-        words.set(numWords - i, (integer % wordRadix).magnitude);
+    value wRadix = wordRadix;
+
+    value wordList = wordListOfSize(64/wordSize);
+    variable value wordsIter = wordList.lowWord;
+    while (exists wordsCurr = wordsIter) {
+        wordsCurr.word = (integer % wRadix).magnitude;
         integer /= wordRadix;
+        wordsIter = wordsCurr.nextHigher;
     }
-    return words;
+    return wordList;
 }
