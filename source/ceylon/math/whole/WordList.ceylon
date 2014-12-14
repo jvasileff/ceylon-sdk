@@ -105,31 +105,3 @@ WordList wordListCopy(WordList source) { // TODO untested
     }
     return WordList(source.size, highWord, higherWord);
 }
-
-WordList wordListOfWords(Words from) {
-    value fromSize = size(from);
-    if (fromSize == 0) {
-        return WordList();
-    }
-    WordCell highWord = WordCell(get(from, 0));
-    variable WordCell higherWord = highWord;
-    for (i in 1:fromSize-1) {
-        value cell = WordCell(get(from, i));
-        cell.nextHigher = higherWord;
-        higherWord.nextLower = cell;
-        higherWord = cell;
-    }
-    return WordList(fromSize, highWord, higherWord);
-}
-
-Words wordsOfWordList(WordList from) {
-    value result = newWords(from.size);
-    variable value iter = from.highWord;
-    variable value i = 0;
-    while (exists curr = iter) {
-        set(result, i, curr.word);
-        iter = curr.nextLower;
-        i++;
-    }
-    return result;
-}

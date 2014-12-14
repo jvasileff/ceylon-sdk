@@ -499,7 +499,7 @@ shared final class Whole
         return rList;
     }
 
-    WordList multiplyWord2(
+    WordList multiplyWord(
             WordList u, Integer v, WordList r = wordListOfSize(u.size)) {
         assert(v.and(wordMask) == v);
 
@@ -534,37 +534,6 @@ shared final class Whole
         }
 
         return r;
-    }
-
-    Words multiplyWord(Words u, Integer v, Words? r = null) {
-        assert(v.and(wordMask) == v);
-
-        value result = r else newWords(size(u) + 1);
-        value resultSize = size(result);
-
-        variable value carry = 0;
-        for (i in 0:size(u)) {
-            value ui = get(u, size(u) - i - 1);
-            value product = ui * v + carry;
-            result.set(resultSize - i - 1, product.and(wordMask));
-            carry = product.rightLogicalShift(wordSize);
-        }
-        if (!carry.zero) {
-            // provided array may be _exactly_ the right size
-            result.set(resultSize - size(u) - 1, carry);
-        }
-        else if (resultSize >= (size(u) + 1)) {
-            // but zero it out if it did have room for a carry word
-            result.set(resultSize - size(u) - 1, 0);
-        }
-
-        // zero out the leading portion of the result array
-        // if an oversized array was provided
-        for (i in 0:resultSize - size(u) - 1) {
-            result.set(i, 0);
-        }
-
-        return result;
     }
 
     "`u[j+1..j+vSize] <- u[j+1..j+vSize] - v * q`, returning the absolute value
@@ -621,9 +590,9 @@ shared final class Whole
         }
         else {
             // size of u will be the size of dividend + 1
-            u = multiplyWord2(dividend, d);
+            u = multiplyWord(dividend, d);
             // size of v will be the size of divisor
-            v = multiplyWord2(divisor, d);
+            v = multiplyWord(divisor, d);
 
             if (u.size == dividend.size) {
                 u.addHighWord(0);
