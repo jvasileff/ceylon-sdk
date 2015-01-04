@@ -1,3 +1,8 @@
+import ceylon.math.whole {
+    Whole,
+    wholeNumber,
+    wholeZero = zero
+}
 class LongImpl16 satisfies Long {
     shared Integer w3;
     shared Integer w2;
@@ -9,6 +14,21 @@ class LongImpl16 satisfies Long {
         this.w2 = w2;
         this.w1 = w1;
         this.w0 = w0;
+    }
+
+    shared new OfWhole(Whole whole) {
+        if (whole.zero) {
+            this.w0 = 0;
+            this.w1 = 0;
+            this.w2 = 0;
+            this.w3 = 0;
+        }
+        else {
+            this.w0 = whole.integer.and(#ffff);
+            this.w1 = whole.rightArithmeticShift(16).integer.and(#ffff);
+            this.w2 = whole.rightArithmeticShift(32).integer.and(#ffff);
+            this.w3 = whole.rightArithmeticShift(48).integer.and(#ffff);
+        }
     }
 
     shared new OfInteger(variable Integer integer) {
@@ -175,9 +195,39 @@ class LongImpl16 satisfies Long {
     shared actual Long timesInteger(Integer integer)
         =>  this * OfInteger(integer);
 
-    shared actual Long divided(Long other) => nothing;
+    shared actual Long divided(Long other) {
+        assert(is LongImpl16 other);
+        if (other.zero) {
+            throw Exception("Divide by zero");
+        }
+        return if (zero) then
+            package.zero
+        else if (other.unit) then
+            this
+        else if (other.negativeOne) then
+            this.negated
+        else if (safelyAddressable && other.safelyAddressable) then
+            OfInteger(this.integer / other.integer)
+        else
+            OfWhole(this.whole / other.whole);
+    }
 
-    shared actual Long remainder(Long other) => nothing;
+    shared actual Long remainder(Long other) {
+        assert(is LongImpl16 other);
+        if (other.zero) {
+            throw Exception("Divide by zero");
+        }
+        return if (zero) then
+            package.zero
+        else if (other.unit) then
+            package.zero
+        else if (other.negativeOne) then
+            package.zero
+        else if (safelyAddressable && other.safelyAddressable) then
+            OfInteger(this.integer % other.integer)
+        else
+            OfWhole(this.whole % other.whole);
+    }
 
     shared actual Long power(Long exponent) {
         if (this.unit) {
@@ -406,7 +456,7 @@ class LongImpl16 satisfies Long {
     shared actual Long negated
         =>  not.plus(package.one);
 
-    // same as Whole - only return integer addressable number of bits
+    // same as with Whole - narrow to integer addressable number of bits
     shared actual Integer integer
         =>  if (runtime.integerAddressableSize == 64) then
                 w0.or(w1.leftLogicalShift(16))
@@ -414,6 +464,28 @@ class LongImpl16 satisfies Long {
                   .or(w3.leftLogicalShift(48))
             else
                 w0.or(w1.leftLogicalShift(16));
+
+    shared actual Whole whole {
+        if (safelyAddressable) {
+            return wholeNumber(integer);
+        }
+        else if (zero) {
+            return wholeZero;
+        }
+        else if (positive) {
+            return wholeNumber(w3)
+                   .leftLogicalShift(16).or(wholeNumber(w2))
+                   .leftLogicalShift(16).or(wholeNumber(w1))
+                   .leftLogicalShift(16).or(wholeNumber(w0));
+        }
+        else {
+            return      wholeNumber(w3.not.and(#ffff).leftLogicalShift(48))
+                    .or(wholeNumber(w2.not.and(#ffff).leftLogicalShift(32)))
+                    .or(wholeNumber(w1.not.and(#ffff).leftLogicalShift(16)))
+                    .or(wholeNumber(w0.not.and(#ffff)))
+                    .not;
+        }
+    }
 
     shared actual Long wholePart
         =>  this;
@@ -446,6 +518,10 @@ class LongImpl16 satisfies Long {
 
     shared actual Integer hash
         =>  integer;
+
+    shared Boolean safelyAddressable
+        =>  (w3 == 0 && w2 == 0 && !w1.get(15)) ||
+            (w3 == #ffff && w2 == #ffff && w1.get(15));
 
     // FIXME won't work on 32bit, implement once division is ready
     shared actual String string => integer.string;

@@ -1,3 +1,6 @@
+import ceylon.math.whole {
+    Whole
+}
 shared sealed interface Long
         satisfies Integral<Long> &
                   Binary<Long> &
@@ -6,5 +9,7 @@ shared sealed interface Long
     shared formal Integer integer;
 
     shared formal Boolean even;
+
+    shared formal Whole whole;
 
 }

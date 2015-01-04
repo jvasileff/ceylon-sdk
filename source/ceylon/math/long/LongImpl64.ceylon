@@ -1,3 +1,7 @@
+import ceylon.math.whole {
+    Whole,
+    wholeNumber
+}
 class LongImpl64 satisfies Long {
 
     shared actual Integer integer;
@@ -149,6 +153,9 @@ class LongImpl64 satisfies Long {
 
     shared actual Integer hash
         => integer.hash;
+
+    shared actual Whole whole
+        => wholeNumber(integer);
 
     shared actual Boolean even
         => integer.even;
