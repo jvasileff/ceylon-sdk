@@ -11,8 +11,11 @@ Long integerMin = longNumber(runtime.minIntegerValue);
 Integer minAddressableInteger = 1.leftLogicalShift(runtime.integerAddressableSize-1);
 Integer maxAddressableInteger = minAddressableInteger.not;
 
-Long longMin = longNumberOfWords(#8000, 0, 0, 0);
-Long longMax = longNumberOfWords(#7fff, #ffff, #ffff, #ffff);
+"The maximum [[Long]] value, equal to (2<sup>63</sup> - 1)."
+shared Long maxLongValue = longNumberOfWords(#7fff, #ffff, #ffff, #ffff);
+
+"The minimum [[Long]] value, equal to -(2<sup>63</sup>)."
+shared Long minLongValue = longNumberOfWords(#8000, 0, 0, 0);
 
 // FIXME
 Boolean realInts = false && runtime.integerAddressableSize == 64;
