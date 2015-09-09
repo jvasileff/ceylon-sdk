@@ -90,6 +90,10 @@ shared interface SetTests satisfies IterableTests {
         assertEquals(createSet{"A", "B", "C"}.intersection(createSet{"A", "B", "C"}), createSet{"A", "B", "C"});
         assertEquals(createSet{"A", "B", "C"}.intersection(createSet{"B", "C", "A"}), createSet{"A", "B", "C"});
         assertEquals(createSet{"A", "B", "C"}.intersection(createSet{"Z", "X", "A", "M", "B"}), createSet{"A", "B"});
+        assertEquals(createSet{1.0}.intersection(createSet({1})), createSet{1.0});
+        assertEquals(createSet{1.0}.intersection(createSet({1})), createSet{1});
+        assertEquals(createSet{1}.intersection(createSet({1.0})), createSet{1.0});
+        assertEquals(createSet{1}.intersection(createSet({1.0})), createSet{1});
     }
 
     test shared void testClone() {
