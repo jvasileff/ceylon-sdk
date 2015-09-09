@@ -105,13 +105,12 @@ shared class TreeSet<Element>(compare, elements={})
         return result;
     }
     
-    shared actual HashSet<Element&Other> intersection<Other>
+    shared actual HashSet<Element> intersection<Other>
             (Set<Other> set)
             given Other satisfies Object {
-        value result = HashSet<Element&Other>();
+        value result = HashSet<Element>();
         for (element in this) {
             if (element in set) {
-                assert (is Other element);
                 result.add(element);
             }
         }

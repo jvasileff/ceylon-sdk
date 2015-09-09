@@ -20,7 +20,7 @@ class UnmodifiableSet<out Element>(Set<Element> set)
             given Other satisfies Object 
             => this.set.exclusiveUnion(set);
     
-    shared actual Set<Element&Other> intersection<Other>(Set<Other> set)
+    shared actual Set<Element> intersection<Other>(Set<Other> set)
             given Other satisfies Object 
             => this.set.intersection(set);
     

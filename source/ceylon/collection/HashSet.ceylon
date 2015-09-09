@@ -385,13 +385,12 @@ shared class HashSet<Element>
         return ret;
     }
     
-    shared actual HashSet<Element&Other> intersection<Other>
+    shared actual HashSet<Element> intersection<Other>
             (Set<Other> set) 
             given Other satisfies Object {
-        value ret = HashSet<Element&Other>();
+        value ret = HashSet<Element>();
         for (elem in this) {
             if (elem in set) {
-                assert (is Other elem);
                 ret.add(elem);
             }
         }

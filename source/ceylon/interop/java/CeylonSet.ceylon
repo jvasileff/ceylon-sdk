@@ -44,12 +44,12 @@ shared class CeylonSet<out Element>(JSet<out Element> set)
         return CeylonSet(exclusiveUnion);
     }
     
-    shared actual Set<Element&Other> 
+    shared actual Set<Element> 
             intersection<Other>(Set<Other> set)
             given Other satisfies Object {
-        value intersection = HashSet<Element&Other>();
+        value intersection = HashSet<Element>();
         for (e in this) {
-            if (is Other e, set.contains(e)) {
+            if (set.contains(e)) {
                 intersection.add(e);
             }
         }

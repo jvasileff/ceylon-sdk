@@ -303,7 +303,8 @@ shared class IdentitySet<Element>
             given Other satisfies Identifiable {
         value ret = IdentitySet<Element&Other>();
         for (elem in this) {
-            if (set.contains(elem), is Other elem) {
+            if (set.contains(elem)) {
+                assert (is Other elem);
                 ret.add(elem);
             }
         }

@@ -11,9 +11,9 @@ shared class SingletonSet<Element>(shared Element element)
             given Other satisfies Object 
             => element in set then emptySet else this;
     
-    shared actual Set<Element&Other> intersection<Other>(Set<Other> set)
+    shared actual Set<Element> intersection<Other>(Set<Other> set)
             given Other satisfies Object {
-        if (is Other element, element in set) {
+        if (element in set) {
             return SingletonSet(element);
         }
         else {
