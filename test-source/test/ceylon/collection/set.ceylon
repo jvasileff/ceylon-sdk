@@ -6,7 +6,8 @@ import ceylon.test {
 }
 
 shared interface SetTests satisfies IterableTests {
-    shared formal Set<String> createSet({String*} strings);
+    shared formal Set<Element> createSet<Element>({Element*} elements)
+            given Element satisfies Object & Comparable<Element>;
 
     test shared void testEquals() {
         {[{String*}, [String*]]+} positiveEqualExamples = {

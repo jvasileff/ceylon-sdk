@@ -10,10 +10,11 @@ import ceylon.test {
 
 shared interface MutableSetTests satisfies SetTests {
 
-    shared actual formal MutableSet<String> createSet({String*} strings);
+    shared actual formal MutableSet<Element> createSet<Element>({Element*} elements)
+            given Element satisfies Object & Comparable<Element>;
 
     test shared void doSetTests() {
-        value set = createSet {};
+        value set = createSet<String> {};
         assertEquals("{}", set.string);
         assertEquals(0, set.size);
         assertEquals(true, set.add("fu"));

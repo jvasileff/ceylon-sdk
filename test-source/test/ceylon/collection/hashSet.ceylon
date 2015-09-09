@@ -10,10 +10,12 @@ import ceylon.test {
 
 shared class HashSetTest() satisfies MutableSetTests & InsertionOrderIterableTests {
 
-    shared actual MutableSet<String> createSet({String*} strings) => HashSet { elements = strings; };
+    shared actual MutableSet<Element> createSet<Element>({Element*} elements)
+            given Element satisfies Object
+        => HashSet { elements = elements; };
 
-    createCategory = createSet;
-    createIterable = createSet;
+    createCategory = createSet<String>;
+    createIterable = createSet<String>;
 
     test shared void elementsAreKeptInOrder() {
         value set = HashSet { "A", "B", "C" };
@@ -24,7 +26,7 @@ shared class HashSetTest() satisfies MutableSetTests & InsertionOrderIterableTes
     }
     
     test shared void elementsAreRemovedFromLinkedList(){
-        value set = createSet{};
+        value set = createSet<String>{};
         set.add("a");
         set.add("b");
         set.remove("a");
@@ -35,9 +37,11 @@ shared class HashSetTest() satisfies MutableSetTests & InsertionOrderIterableTes
 
 shared class UnlinkedHashSetTest() satisfies MutableSetTests & HashOrderIterableTests {
 
-    shared actual MutableSet<String> createSet({String*} strings) => HashSet { stability = unlinked; elements = strings; };
+    shared actual MutableSet<Element> createSet<Element>({Element*} elements)
+            given Element satisfies Object
+        => HashSet { stability = unlinked; elements = elements; };
 
-    createCategory = createSet;
-    createIterable = createSet;
+    createCategory = createSet<String>;
+    createIterable = createSet<String>;
 
 }
